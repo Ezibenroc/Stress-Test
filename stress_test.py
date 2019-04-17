@@ -1,10 +1,11 @@
 import time
 import datetime
-import os
 import sys
 import numpy
 import csv
+import glob
 import argparse
+from subprocess import Popen, PIPE
 
 
 class BLAS:
@@ -31,25 +32,42 @@ class BLAS:
         return [[duration, gflops]]
 
 
-class Thermometer:
-    header = ['sensor_id', 'temperature']
+class FileWatcher:
+    header = ['id', 'value']
 
-    def __init__(self):
-        self.temp_files = []
-        main_dir = '/sys/class/thermal/'
-        for dirname in os.listdir(main_dir):
-            if dirname.startswith('thermal_zone'):
-                self.temp_files.append(os.path.join(main_dir, dirname, 'temp'))
+    def __init__(self, files):
+        self.files = files
 
     def get_values(self):
-        temperatures = []
-        for i, filename in enumerate(self.temp_files):
+        values = []
+        for i, filename in enumerate(self.files):
             with open(filename) as f:
                 lines = f.readlines()
                 assert len(lines) == 1
-                temp = int(lines[0])
-                temperatures.append([i, temp / 1000])  # temperatures in millidegree Celcius
-        return temperatures
+                values.append((i, int(lines[0])))
+        return values
+
+
+class Thermometer(FileWatcher):
+    header = ['sensor_id', 'temperature']
+
+    def __init__(self):
+        super().__init__(glob.glob('/sys/class/thermal/thermal_zone*/temp'))
+
+    def get_values(self):
+        temperatures = super().get_values()
+        return [[i, temp/1000] for i, temp in temperatures]  # temperature in millidegree Celcius
+
+
+class CPUFreq(FileWatcher):
+    header = ['core_id', 'frequency']
+
+    def __init__(self):
+        super().__init__(glob.glob('/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq'))
+
+    def get_values(self):
+        frequencies = super().get_values()
+        return [[i, freq*1000] for i, freq in frequencies]  # frequency in kilo Hertz
 
 
 class Writer:
@@ -73,7 +91,7 @@ class Writer:
         return str(datetime.datetime.now())
 
 
-def loop(blas_writer, thermo_writer, nb_calls, nb_runs, nb_sleeps, sleep_time):
+def loop_blas(blas_writer, thermo_writer, nb_calls, nb_runs, nb_sleeps, sleep_time):
     thermo_writer.add_measure()
     for run in range(nb_runs):
         for call in range(nb_calls):
@@ -84,26 +102,57 @@ def loop(blas_writer, thermo_writer, nb_calls, nb_runs, nb_sleeps, sleep_time):
             thermo_writer.add_measure()
 
 
+def loop_cmd(thermo_writer, freq_writer, cmd, nb_runs, nb_sleeps, sleep_time):
+    thermo_writer.add_measure()
+    freq_writer.add_measure()
+    for run in range(nb_runs):
+        print('%s | %s' % (Writer.get_timestamp(), cmd))
+        proc = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
+        while proc.poll() is None:
+            time.sleep(sleep_time)
+            thermo_writer.add_measure()
+            freq_writer.add_measure()
+        stdout, stderr = proc.communicate()
+        sys.stdout.write(stdout.decode())
+        sys.stderr.write(stderr.decode())
+        if proc.returncode != 0:
+            sys.exit(proc.returncode)
+        for sleep in range(nb_sleeps):
+            time.sleep(sleep_time)
+            thermo_writer.add_measure()
+
+
 def main(args):
-    parser = argparse.ArgumentParser(description='Stress test with performance and temperature measurements')
-    parser.add_argument('--size', type=int, default=4096,
-                        help='Problem size (rank of the matrix) to use in the tests')
-    parser.add_argument('--perf_output', type=str, default='/tmp/stress_perf.csv',
-                        help='Output file for the performance measures')
+    parser = argparse.ArgumentParser(description='Stress test with performance, frequency and temperature measurements')
     parser.add_argument('--temp_output', type=str, default='/tmp/stress_temp.csv',
                         help='Output file for the temperature measures')
-    parser.add_argument('--nb_calls', type=int, default=10,
-                        help='Number of consecutive calls in a run')
     parser.add_argument('--nb_runs', type=int, default=10,
                         help='Number of runs to perform')
     parser.add_argument('--nb_sleeps', type=int, default=100,
                         help='Number of sleeps to perform between each run')
     parser.add_argument('--sleep_time', type=float, default=1,
                         help='Duration of a sleep')
+    sp = parser.add_subparsers(dest='mode')
+    sp.required = True
+    sp_blas = sp.add_parser('blas', help='Compute a matrix matrix product.')
+    sp_blas.add_argument('--size', type=int, default=4096,
+                         help='Problem size (rank of the matrix) to use in the tests')
+    sp_blas.add_argument('--perf_output', type=str, default='/tmp/stress_perf.csv',
+                         help='Output file for the performance measures')
+    sp_blas.add_argument('--nb_calls', type=int, default=10,
+                         help='Number of consecutive calls in a run')
+    sp_cmd = sp.add_parser('command', help='Run a command given as argument.')
+    sp_cmd.add_argument('cmd', type=str, help='Command to run')
+    sp_cmd.add_argument('--freq_output', type=str, default='/tmp/stress_freq.csv',
+                        help='Output file for the frequency measures')
     args = parser.parse_args(args)
-    blas_writer = Writer(BLAS(args.size), args.perf_output)
     thermo_writer = Writer(Thermometer(), args.temp_output)
-    loop(blas_writer, thermo_writer, args.nb_calls, args.nb_runs, args.nb_sleeps, args.sleep_time)
+    if args.mode == 'blas':
+        blas_writer = Writer(BLAS(args.size), args.perf_output)
+        loop_blas(blas_writer, thermo_writer, args.nb_calls, args.nb_runs, args.nb_sleeps, args.sleep_time)
+    if args.mode == 'command':
+        freq_writer = Writer(CPUFreq(), args.freq_output)
+        loop_cmd(thermo_writer, freq_writer, args.cmd, args.nb_runs, args.nb_sleeps, args.sleep_time)
 
 
 if __name__ == '__main__':
