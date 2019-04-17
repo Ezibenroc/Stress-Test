@@ -120,6 +120,7 @@ def loop_cmd(thermo_writer, freq_writer, cmd, nb_runs, nb_sleeps, sleep_time):
         for sleep in range(nb_sleeps):
             time.sleep(sleep_time)
             thermo_writer.add_measure()
+            freq_writer.add_measure()
 
 
 def main(args):
