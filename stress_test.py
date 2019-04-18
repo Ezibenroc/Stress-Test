@@ -5,6 +5,8 @@ import numpy
 import csv
 import glob
 import argparse
+import os
+import re
 from subprocess import Popen, PIPE
 
 
@@ -35,12 +37,21 @@ class BLAS:
 class FileWatcher:
     header = ['id', 'value']
 
-    def __init__(self, files):
-        self.files = files
+    def __init__(self, prefix, name, suffix):
+        '''
+        Suppose files of the form prefix/name42/suffix
+        '''
+        self.files = {}
+        regex = re.compile('^%s(?P<id>\\d+)$' % name)
+        for dirname in os.listdir(prefix):
+            match = regex.match(dirname)
+            if match:
+                new_id = int(match.group('id'))
+                self.files[new_id] = os.path.join(prefix, dirname, suffix)
 
     def get_values(self):
         values = []
-        for i, filename in enumerate(self.files):
+        for i, filename in self.files.items():
             with open(filename) as f:
                 lines = f.readlines()
                 assert len(lines) == 1
@@ -52,7 +63,7 @@ class Thermometer(FileWatcher):
     header = ['sensor_id', 'temperature']
 
     def __init__(self):
-        super().__init__(glob.glob('/sys/class/thermal/thermal_zone*/temp'))
+        super().__init__('/sys/class/thermal', 'thermal_zone', 'temp')
 
     def get_values(self):
         temperatures = super().get_values()
@@ -63,7 +74,7 @@ class CPUFreq(FileWatcher):
     header = ['core_id', 'frequency']
 
     def __init__(self):
-        super().__init__(glob.glob('/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq'))
+        super().__init__('/sys/devices/system/cpu', 'cpu', 'cpufreq/scaling_cur_freq')
 
     def get_values(self):
         frequencies = super().get_values()
