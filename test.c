@@ -51,7 +51,7 @@ void measure_call(FILE *f, unsigned long long size) {
     unsigned long long duration = compute_duration(start, stop);
     char start_date[50], stop_date[50];
     assert(timespec2str(start_date, sizeof(start_date), &start) == 0);
-    assert(timespec2str(stop_date, sizeof(stop_date), &start) == 0);
+    assert(timespec2str(stop_date, sizeof(stop_date), &stop) == 0);
     fprintf(f, "%s,%s,%llu,%llu,%e\n", start_date, stop_date, duration, nb_cycles, ((double)nb_cycles)/duration);
 }
 
