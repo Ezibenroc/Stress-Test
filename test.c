@@ -41,7 +41,7 @@ int timespec2str(char *buf, uint len, timestamp_t *ts) {
     return 0;
 }
 
-void measure_call(FILE *f, unsigned long long size) {
+void measure_call(FILE *f, unsigned long long size, long id) {
     timestamp_t start = get_time();
     unsigned long long start_cycle = __rdtsc();
     for(unsigned long long i=0; i < size; i++);
@@ -52,24 +52,25 @@ void measure_call(FILE *f, unsigned long long size) {
     char start_date[50], stop_date[50];
     assert(timespec2str(start_date, sizeof(start_date), &start) == 0);
     assert(timespec2str(stop_date, sizeof(stop_date), &stop) == 0);
-    fprintf(f, "%s,%s,%llu,%llu,%e\n", start_date, stop_date, duration, nb_cycles, ((double)nb_cycles)/duration);
+    fprintf(f, "%s,%s,%llu,%llu,%li\n", start_date, stop_date, duration, nb_cycles, id);
 }
 
 int main(int argc, char *argv[]) {
-    if(argc != 4) {
-        fprintf(stderr, "Syntax: %s <filename> <nb_calls> <size>\n", argv[0]);
+    if(argc != 5) {
+        fprintf(stderr, "Syntax: %s <filename> <nb_calls> <size> <ID>\n", argv[0]);
         exit(1);
     }
     char *end;
     unsigned long long nb_calls = strtoull(argv[2], &end, 10);
     unsigned long long size = strtoull(argv[3], &end, 10);
+    long id = strtol(argv[4], &end, 10);
     FILE *f = fopen(argv[1], "w");
     if(!f) {
         perror("fopen");
         exit(1);
     }
     for(unsigned long long i = 0; i < nb_calls; i++) {
-        measure_call(f, size);
+        measure_call(f, size, id);
     }
     fclose(f);
     return 0;
