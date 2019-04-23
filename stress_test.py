@@ -142,7 +142,7 @@ class Loop:
         assert len(set(cores)) == len(cores)
         self.filename = filename
         with open(filename, 'w') as f:
-            f.write('start,end,duration,nb_cycles,core_id\n')
+            f.write('start,stop,duration,nb_cycles,core_id\n')
         self.nb_calls = nb_calls
         self.size = size
         self.cores = cores
