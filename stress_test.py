@@ -142,7 +142,7 @@ class Loop:
         assert len(set(cores)) == len(cores)
         self.filename = filename
         with open(filename, 'w') as f:
-            f.write('start,stop,duration,nb_cycles,core_id\n')
+            f.write('start,stop,duration,nb_cycles,core_id,gflops\n')
         self.nb_calls = nb_calls
         self.size = size
         self.cores = cores
@@ -155,7 +155,7 @@ class Loop:
 
     @classmethod
     def compile_exec(cls):
-        cmd = 'gcc %s.c -o %s -Wall' % (cls.EXEC_NAME, cls.EXEC_NAME)
+        cmd = 'gcc -lblas %s.c -o %s -Wall' % (cls.EXEC_NAME, cls.EXEC_NAME)
         print(cmd)
         proc = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
         stdout, stderr = proc.communicate()
@@ -165,6 +165,7 @@ class Loop:
     @classmethod
     def run(cls, tmpfile, nb_calls, size, core):
         numactl_str = 'numactl --physcpubind=%d --localalloc' % core if cls.NUMA else ''
+        os.environ['OMP_NUM_THREADS'] = '1'
         cmd = '%s ./%s %s %d %d %d' % (numactl_str, cls.EXEC_NAME, tmpfile, nb_calls, size, core)
         print(cmd)
         return Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
