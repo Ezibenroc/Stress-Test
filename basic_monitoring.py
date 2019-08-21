@@ -95,11 +95,16 @@ def main(args):
                         help='Output file for the temperature measures')
     parser.add_argument('--freq_output', type=str, default='/tmp/monitoring_freq.csv',
                         help='Output file for the frequency measures')
+    parser.add_argument('--pid_file', type=str, default='/tmp/monitoring_pid',
+                        help='File in which the PID of this process will be written')
     parser.add_argument('--period', type=float, default=1,
                         help='Interval of time between each measure')
     args = parser.parse_args(args)
     thermo_writer = Writer(Thermometer(), args.temp_output)
     freq_writer = Writer(CPUFreq(), args.freq_output)
+    pid = os.getpid()
+    with open(args.pid_file, 'w') as f:
+        f.write('%d\n' % pid)
     print('Starting to monitor the system, press Ctrl-C to stop')
     loop(thermo_writer, freq_writer, args.period)
 
