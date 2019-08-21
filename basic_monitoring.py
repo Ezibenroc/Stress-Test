@@ -7,6 +7,7 @@ import glob
 import argparse
 import os
 import re
+import socket
 
 
 class FileWatcher:
@@ -62,14 +63,15 @@ class Writer:
         self.filename = filename
         self.file = open(filename, 'w')
         self.writer = csv.writer(self.file)
-        self.writer.writerow(['start', 'stop'] + self.subject.header)
+        self.hostname = socket.gethostname()
+        self.writer.writerow(['hostname', 'start', 'stop'] + self.subject.header)
 
     def add_measure(self):
         start = self.get_timestamp()
         lines = self.subject.get_values()
         stop = self.get_timestamp()
         for line in lines:
-            self.writer.writerow([start, stop] + line)
+            self.writer.writerow([self.hostname, start, stop] + line)
         self.file.flush()
 
     @staticmethod
