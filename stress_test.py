@@ -8,6 +8,7 @@ import argparse
 import os
 import re
 from subprocess import Popen, PIPE
+from basic_monitoring import FileWatcher, Thermometer, CPUFreq, Writer
 
 
 class BLAS:
@@ -32,74 +33,6 @@ class BLAS:
         duration = self.compute()
         gflops = 2*self.matrix_rank**3/duration * 1e-9
         return [[duration, gflops]]
-
-
-class FileWatcher:
-    header = ['id', 'value']
-
-    def __init__(self, prefix, name, suffix):
-        '''
-        Suppose files of the form prefix/name42/suffix
-        '''
-        self.files = {}
-        regex = re.compile('^%s(?P<id>\\d+)$' % name)
-        for dirname in os.listdir(prefix):
-            match = regex.match(dirname)
-            if match:
-                new_id = int(match.group('id'))
-                self.files[new_id] = os.path.join(prefix, dirname, suffix)
-
-    def get_values(self):
-        values = []
-        for i, filename in self.files.items():
-            with open(filename) as f:
-                lines = f.readlines()
-                assert len(lines) == 1
-                values.append((i, int(lines[0])))
-        return values
-
-
-class Thermometer(FileWatcher):
-    header = ['sensor_id', 'temperature']
-
-    def __init__(self):
-        super().__init__('/sys/class/thermal', 'thermal_zone', 'temp')
-
-    def get_values(self):
-        temperatures = super().get_values()
-        return [[i, temp/1000] for i, temp in temperatures]  # temperature in millidegree Celcius
-
-
-class CPUFreq(FileWatcher):
-    header = ['core_id', 'frequency']
-
-    def __init__(self):
-        super().__init__('/sys/devices/system/cpu', 'cpu', 'cpufreq/scaling_cur_freq')
-
-    def get_values(self):
-        frequencies = super().get_values()
-        return [[i, freq*1000] for i, freq in frequencies]  # frequency in kilo Hertz
-
-
-class Writer:
-    def __init__(self, subject, filename):
-        self.subject = subject
-        self.filename = filename
-        self.file = open(filename, 'w')
-        self.writer = csv.writer(self.file)
-        self.writer.writerow(['start', 'stop'] + self.subject.header)
-
-    def add_measure(self):
-        start = self.get_timestamp()
-        lines = self.subject.get_values()
-        stop = self.get_timestamp()
-        for line in lines:
-            self.writer.writerow([start, stop] + line)
-        self.file.flush()
-
-    @staticmethod
-    def get_timestamp():
-        return str(datetime.datetime.now())
 
 
 def loop_blas(blas_writer, thermo_writer, nb_calls, nb_runs, nb_sleeps, sleep_time):
