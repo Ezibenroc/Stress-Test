@@ -3,7 +3,6 @@ import datetime
 import sys
 import numpy
 import csv
-import glob
 import argparse
 import os
 import re
