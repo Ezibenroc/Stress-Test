@@ -87,7 +87,7 @@ class Loop:
 
     @classmethod
     def compile_exec(cls):
-        cmd = 'gcc -lblas %s.c -o %s -Wall' % (cls.EXEC_NAME, cls.EXEC_NAME)
+        cmd = 'gcc -lblas util.c %s.c -o %s -Wall' % (cls.EXEC_NAME, cls.EXEC_NAME)
         print(cmd)
         proc = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
         stdout, stderr = proc.communicate()
