@@ -4,6 +4,7 @@
 #include <x86intrin.h>
 #include <math.h>
 #include <string.h>
+#include <stdint.h>
 #include "util.h"
 
 typedef double number;
@@ -63,15 +64,23 @@ int main(int argc, char *argv[]) {
             tab[i] = value;
         }
     }
-    else if(strcmp("adversary", mode) == 0) {
-        double value = (double)rand()/(double)(RAND_MAX);
-        for(int i = 0; i < 6; i++) {
-            // TODO initialization here
-            tab[i] = 1/0;
+    else if(strcmp("adversarial", mode) == 0) {
+        unsigned long long mask_1, mask_2;
+        // the mantisse of the 1st mask is the bit sequence 0b010101... (i.e. 0x555...)
+        // the mantisse of the 2nd mask is the bit sequence 0b101010... (i.e. 0xAAA...)
+        // for both masks, the exponent is 0x3EF, to have a floating point number not "too large" nor "too small"
+        // the sign is 0 (i.e. positive number)
+        mask_1 = 0x3EF5555555555555;
+        mask_2 = 0x3EFAAAAAAAAAAAAA;
+        for(int i = 0; i < 3; i++) {
+            tab[i] = *((double*)&mask_1);
+        }
+        for(int i = 3; i < 6; i++) {
+            tab[i] = *((double*)&mask_2);
         }
     }
     else {
-        fprintf(stderr, "Error, unknown mode '%s', must be 'random', 'equal' or 'adversary'\n", mode);
+        fprintf(stderr, "Error, unknown mode '%s', must be 'random', 'equal' or 'adversarial'\n", mode);
         exit(1);
     }
 
