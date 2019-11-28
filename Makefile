@@ -1,8 +1,8 @@
-test_flips:
-	gcc -lm -O2 util.c test_flips.c -o test_flips
+test_flips: test_flips.c util.c
+	gcc -lm -O2 $^ -o $@
 
-test:
-	gcc -lblas -O2 util.c test.c -o test
+test: test.c util.c
+	gcc -lblas -O2 $^ -o $@
 
 clean:
 	rm -f test_flips test
