@@ -65,43 +65,40 @@ void print_bits_f(double x) {
     print_bits(*tmp);
 }
 
-void measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[6]) {
+number measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[4]) {
+#ifdef AVX2
+    number x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, xA, xB = _mm256_set1_pd(0);
+#else
+    number x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, xA, xB = 0;
+#endif
     timestamp_t start = get_time();
     for(unsigned long long i = 0; i < inner_loop; i++) {
 #ifdef AVX2
-        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
-        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
-        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
-        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
-        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
-        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
-        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
-        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
-        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
-        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
-        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
-        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
-        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
-        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
-        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
-        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+        x0 = _mm256_fmadd_pd(tab[0], tab[1], x0);
+        x1 = _mm256_fmadd_pd(tab[2], tab[3], x1);
+        x2 = _mm256_fmadd_pd(tab[0], tab[1], x2);
+        x3 = _mm256_fmadd_pd(tab[2], tab[3], x3);
+        x4 = _mm256_fmadd_pd(tab[0], tab[1], x4);
+        x5 = _mm256_fmadd_pd(tab[2], tab[3], x5);
+        x6 = _mm256_fmadd_pd(tab[0], tab[1], x6);
+        x7 = _mm256_fmadd_pd(tab[2], tab[3], x7);
+        x8 = _mm256_fmadd_pd(tab[0], tab[1], x8);
+        x9 = _mm256_fmadd_pd(tab[2], tab[3], x9);
+        xA = _mm256_fmadd_pd(tab[0], tab[1], xA);
+        xB = _mm256_fmadd_pd(tab[2], tab[3], xB);
 #else
-        tab[0] += tab[1]*tab[2];
-        tab[3] += tab[4]*tab[5];
-        tab[0] += tab[1]*tab[2];
-        tab[3] += tab[4]*tab[5];
-        tab[0] += tab[1]*tab[2];
-        tab[3] += tab[4]*tab[5];
-        tab[0] += tab[1]*tab[2];
-        tab[3] += tab[4]*tab[5];
-        tab[0] += tab[1]*tab[2];
-        tab[3] += tab[4]*tab[5];
-        tab[0] += tab[1]*tab[2];
-        tab[3] += tab[4]*tab[5];
-        tab[0] += tab[1]*tab[2];
-        tab[3] += tab[4]*tab[5];
-        tab[0] += tab[1]*tab[2];
-        tab[3] += tab[4]*tab[5];
+        x0 += tab[0] * tab[1];
+        x1 += tab[2] * tab[3];
+        x2 += tab[0] * tab[1];
+        x3 += tab[2] * tab[3];
+        x4 += tab[0] * tab[1];
+        x5 += tab[2] * tab[3];
+        x6 += tab[0] * tab[1];
+        x7 += tab[2] * tab[3];
+        x8 += tab[0] * tab[1];
+        x9 += tab[2] * tab[3];
+        xA += tab[0] * tab[1];
+        xB += tab[2] * tab[3];
 #endif
     }
     timestamp_t stop = get_time();
@@ -109,6 +106,25 @@ void measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[6]
     char human_timestamp[50];
     assert(timespec2str(human_timestamp, sizeof(human_timestamp), &start) == 0);
     fprintf(f, "%s,%llu,%li\n", human_timestamp, duration, id);
+    number result;
+#ifdef AVX2
+    x0 = _mm256_add_pd(x0, x1);
+    x0 = _mm256_add_pd(x0, x2);
+    x0 = _mm256_add_pd(x0, x3);
+    x0 = _mm256_add_pd(x0, x4);
+    x0 = _mm256_add_pd(x0, x5);
+    x0 = _mm256_add_pd(x0, x6);
+    x0 = _mm256_add_pd(x0, x7);
+    x0 = _mm256_add_pd(x0, x8);
+    x0 = _mm256_add_pd(x0, x9);
+    x0 = _mm256_add_pd(x0, xA);
+    x0 = _mm256_add_pd(x0, xB);
+    result = x0;
+#else
+    result = x0 + x1 + x2 + x3 + x4 + x5;
+    result+= x6 + x7 + x8 + x9 + xA + xB;
+#endif
+    return result;
 }
 
 int main(int argc, char *argv[]) {
@@ -132,12 +148,12 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    number tab[6];
+    number tab[4];
     double *tab_alias = (double*) tab;
 #ifdef AVX2
-    int tab_limit = 6*4;
+    int tab_limit = 4*4;
 #else
-    int tab_limit = 6;
+    int tab_limit = 4;
 #endif
     unsigned long long val_1, val_2;
     uint64_t mask = get_mask(0, mask_size);
@@ -154,15 +170,12 @@ int main(int argc, char *argv[]) {
         tab_alias[i] = *((double*)&val_2);
     }
     print_bits_f(tab_alias[0]);
-    print_bits_f(tab_alias[3]);
+    print_bits_f(tab_alias[2]);
 
     printf("%e %e\n", tab_alias[0], tab_alias[3]);
     for(unsigned long long i = 0; i < outer_loop; i++) {
         measure_call(f, inner_loop, id, tab);
     }
-    printf("%e %e\n", tab_alias[0], tab_alias[3]);
-    assert(isfinite(tab_alias[0]));
-    assert(isfinite(tab_alias[3]));
 
     fclose(f);
     return 0;
