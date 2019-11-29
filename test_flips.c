@@ -7,7 +7,11 @@
 #include <stdint.h>
 #include "util.h"
 
+#ifdef AVX2
+typedef __m256d number;
+#else
 typedef double number;
+#endif
 
 /*
  * Return 0b000...01...1, with n ones at the end.
@@ -64,6 +68,24 @@ void print_bits_f(double x) {
 void measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[6]) {
     timestamp_t start = get_time();
     for(unsigned long long i = 0; i < inner_loop; i++) {
+#ifdef AVX2
+        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
+        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
+        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
+        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
+        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
+        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
+        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
+        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+        tab[0] = _mm256_fmadd_pd(tab[1], tab[2], tab[0]);
+        tab[3] = _mm256_fmadd_pd(tab[4], tab[5], tab[3]);
+#else
         tab[0] += tab[1]*tab[2];
         tab[3] += tab[4]*tab[5];
         tab[0] += tab[1]*tab[2];
@@ -80,6 +102,7 @@ void measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[6]
         tab[3] += tab[4]*tab[5];
         tab[0] += tab[1]*tab[2];
         tab[3] += tab[4]*tab[5];
+#endif
     }
     timestamp_t stop = get_time();
     unsigned long long duration = compute_duration(start, stop);
@@ -89,6 +112,11 @@ void measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[6]
 }
 
 int main(int argc, char *argv[]) {
+#ifdef AVX2
+    printf("Using AVX2 mode\n");
+#else
+    printf("Using scalar mode\n");
+#endif
     if(argc != 6) {
         fprintf(stderr, "Syntax: %s <filename> <mask_size> <outer_loop> <inner_loop> <ID>\n", argv[0]);
         exit(1);
@@ -105,6 +133,12 @@ int main(int argc, char *argv[]) {
     }
 
     number tab[6];
+    double *tab_alias = (double*) tab;
+#ifdef AVX2
+    int tab_limit = 6*4;
+#else
+    int tab_limit = 6;
+#endif
     unsigned long long val_1, val_2;
     uint64_t mask = get_mask(0, mask_size);
     // the mantisse of the 1st mask is the bit sequence 0b010101... (i.e. 0x555...)
@@ -113,22 +147,22 @@ int main(int argc, char *argv[]) {
     // the sign is 0 (i.e. positive number)
     val_1 = 0x3EF5555555555555 | mask;
     val_2 = 0x3EFAAAAAAAAAAAAA | mask;
-    for(int i = 0; i < 3; i++) {
-        tab[i] = *((double*)&val_1);
+    for(int i = 0; i < tab_limit/2; i++) {
+        tab_alias[i] = *((double*)&val_1);
     }
-    for(int i = 3; i < 6; i++) {
-        tab[i] = *((double*)&val_2);
+    for(int i = tab_limit/2; i < tab_limit; i++) {
+        tab_alias[i] = *((double*)&val_2);
     }
-    print_bits_f(tab[0]);
-    print_bits_f(tab[3]);
+    print_bits_f(tab_alias[0]);
+    print_bits_f(tab_alias[3]);
 
-    printf("%e %e\n", tab[0], tab[3]);
+    printf("%e %e\n", tab_alias[0], tab_alias[3]);
     for(unsigned long long i = 0; i < outer_loop; i++) {
         measure_call(f, inner_loop, id, tab);
     }
-    printf("%e %e\n", tab[0], tab[3]);
-    assert(isfinite(tab[0]));
-    assert(isfinite(tab[3]));
+    printf("%e %e\n", tab_alias[0], tab_alias[3]);
+    assert(isfinite(tab_alias[0]));
+    assert(isfinite(tab_alias[3]));
 
     fclose(f);
     return 0;
