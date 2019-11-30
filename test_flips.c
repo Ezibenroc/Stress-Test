@@ -66,11 +66,24 @@ void print_bits_f(double x) {
 }
 
 number measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[4]) {
+    number x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, xA, xB;
 #ifdef AVX2
-    number x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, xA, xB = _mm256_set1_pd(0);
+    number base_val = _mm256_set1_pd(0);
 #else
-    number x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, xA, xB = 0;
+    number base_val = 0;
 #endif
+    x0 = base_val;
+    x1 = base_val;
+    x2 = base_val;
+    x3 = base_val;
+    x4 = base_val;
+    x5 = base_val;
+    x6 = base_val;
+    x7 = base_val;
+    x8 = base_val;
+    x9 = base_val;
+    xA = base_val;
+    xB = base_val;
     timestamp_t start = get_time();
     for(unsigned long long i = 0; i < inner_loop; i++) {
 #ifdef AVX2
@@ -107,6 +120,9 @@ number measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[
     assert(timespec2str(human_timestamp, sizeof(human_timestamp), &start) == 0);
     fprintf(f, "%s,%llu,%li\n", human_timestamp, duration, id);
     number result;
+//  double *a = (double*) &x0;
+//  double *b = (double*) &x1;
+//  printf("%e %e\n", *a, *b);
 #ifdef AVX2
     x0 = _mm256_add_pd(x0, x1);
     x0 = _mm256_add_pd(x0, x2);
@@ -170,11 +186,13 @@ int main(int argc, char *argv[]) {
         tab_alias[i] = *((double*)&val_2);
     }
     print_bits_f(tab_alias[0]);
-    print_bits_f(tab_alias[2]);
+    print_bits_f(tab_alias[tab_limit/2]);
 
     printf("%e %e\n", tab_alias[0], tab_alias[3]);
     for(unsigned long long i = 0; i < outer_loop; i++) {
-        measure_call(f, inner_loop, id, tab);
+        number result = measure_call(f, inner_loop, id, tab);
+    //  double *tmp = (double*) &result;
+    //  printf("%e\n", *tmp);
     }
 
     fclose(f);
