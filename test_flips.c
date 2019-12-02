@@ -65,25 +65,42 @@ void print_bits_f(double x) {
     print_bits(*tmp);
 }
 
+/*
+ * This function always returns 0 (either a vector or a scalar, depending on AVX2 variable).
+ * It is over-complicated to prevent the compiler from optimizing the code of measure_call.
+ * Without doing that (e.g. if we immediately return 0 in this function), with the flag -O1 or -O2, gcc is apparently
+ * able to detect that we are computing several times the same value and removes several calls to the FMA (e.g. in some
+ * tests I did, it produced 7 FMA per loop instead of 12).
+ */
+number init_base_val(void) {
+#ifdef AVX2
+    number result;
+    double *tmp = (double*) &result;
+    tmp[0] = __rdtsc()*round(sin(0));
+    tmp[1] = __rdtsc()*round(sin(0));
+    tmp[2] = __rdtsc()*round(sin(0));
+    tmp[3] = __rdtsc()*round(sin(0));
+    return result;
+#else
+    number result = __rdtsc()*round(sin(0));
+    return result;
+#endif
+}
+
 number measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[4]) {
     number x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, xA, xB;
-#ifdef AVX2
-    number base_val = _mm256_set1_pd(0);
-#else
-    number base_val = 0;
-#endif
-    x0 = base_val;
-    x1 = base_val;
-    x2 = base_val;
-    x3 = base_val;
-    x4 = base_val;
-    x5 = base_val;
-    x6 = base_val;
-    x7 = base_val;
-    x8 = base_val;
-    x9 = base_val;
-    xA = base_val;
-    xB = base_val;
+    x0 = init_base_val();
+    x1 = init_base_val();
+    x2 = init_base_val();
+    x3 = init_base_val();
+    x4 = init_base_val();
+    x5 = init_base_val();
+    x6 = init_base_val();
+    x7 = init_base_val();
+    x8 = init_base_val();
+    x9 = init_base_val();
+    xA = init_base_val();
+    xB = init_base_val();
     timestamp_t start = get_time();
     for(unsigned long long i = 0; i < inner_loop; i++) {
 #ifdef AVX2
@@ -191,8 +208,6 @@ int main(int argc, char *argv[]) {
     printf("%e %e\n", tab_alias[0], tab_alias[3]);
     for(unsigned long long i = 0; i < outer_loop; i++) {
         number result = measure_call(f, inner_loop, id, tab);
-    //  double *tmp = (double*) &result;
-    //  printf("%e\n", *tmp);
     }
 
     fclose(f);
