@@ -12,6 +12,7 @@ typedef __m256d number;
 #else
 typedef double number;
 #endif
+#define UNROL_SIZE 12
 
 /*
  * Return 0b000...01...1, with n ones at the end.
@@ -87,6 +88,16 @@ number init_base_val(void) {
 #endif
 }
 
+unsigned long long get_nb_flop(unsigned long long inner_loop) {
+    unsigned long long nb_flop = inner_loop;
+    nb_flop *= 2; // FMA -> 2 float operations per instruction
+    nb_flop *= UNROL_SIZE; // number of operations per loop iteration
+#ifdef AVX2
+    nb_flop *= 4; // 256 bit vectors, so 4 double operations per instruction
+#endif
+    return nb_flop;
+}
+
 number measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[4]) {
     number x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, xA, xB;
     x0 = init_base_val();
@@ -135,7 +146,7 @@ number measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[
     unsigned long long duration = compute_duration(start, stop);
     char human_timestamp[50];
     assert(timespec2str(human_timestamp, sizeof(human_timestamp), &start) == 0);
-    fprintf(f, "%s,%llu,%li\n", human_timestamp, duration, id);
+    fprintf(f, "%s,%llu,%llu,%li\n", human_timestamp, duration, get_nb_flop(inner_loop), id);
     number result;
 //  double *a = (double*) &x0;
 //  double *b = (double*) &x1;
@@ -180,6 +191,9 @@ int main(int argc, char *argv[]) {
         perror("fopen");
         exit(1);
     }
+    unsigned long long nb_flop = get_nb_flop(inner_loop);
+    double estimated_time = nb_flop * 1e-9 / 30.0 * outer_loop;
+    printf("Estimated time: %.2f seconds on a 30 Gflop/s core\n", estimated_time);
 
     number tab[4];
     double *tab_alias = (double*) tab;
