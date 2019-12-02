@@ -146,7 +146,9 @@ number measure_call(FILE *f, unsigned long long inner_loop, long id, number tab[
     unsigned long long duration = compute_duration(start, stop);
     char human_timestamp[50];
     assert(timespec2str(human_timestamp, sizeof(human_timestamp), &start) == 0);
-    fprintf(f, "%s,%llu,%llu,%li\n", human_timestamp, duration, get_nb_flop(inner_loop), id);
+    unsigned long long flop = get_nb_flop(inner_loop);
+    fprintf(f, "%s,%llu,%llu,%li\n", human_timestamp, duration, flop, id);
+    printf("%.2f Gflop/s\n", flop/(double)duration);
     number result;
 //  double *a = (double*) &x0;
 //  double *b = (double*) &x1;
